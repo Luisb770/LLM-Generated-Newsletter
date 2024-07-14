@@ -1,5 +1,6 @@
 import arxiv
 import ollama
+from rouge_score import rouge_scorer
 
 # Caching mechanism
 cache = {}
@@ -50,7 +51,7 @@ def categorize_abstract_with_llama(summary):
         "Neural Networks", "Reinforcement Learning", "Ensemble Learning",
         "Inferential Statistics", "Descriptive Statistics", "Machine Learning",
         "Statistics Sampling", "Bioinformatics", "Statistical Decision Theory",
-        "Spatial Statistics"
+        "Spatial Statistics", "Casual Inference"
     ]
     try:
         response = ollama.chat(model="llama3", messages=[
@@ -81,6 +82,12 @@ def get_summary_from_cache(abstract_text):
     cache[abstract_text] = summary
     return summary
 
+# Function to calculate ROUGE score
+def calculate_rouge(reference, summary):
+    scorer = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
+    scores = scorer.score(reference, summary)
+    return scores
+
 # Function to create the newsletter
 def create_newsletter(categorized):
     print("Creating the newsletter catered to statistics researchers and PhDs...")
@@ -93,7 +100,19 @@ def create_newsletter(categorized):
                     authors = ', '.join(author.name for author in paper.authors)
                     link = paper.entry_id
                     prompt += f"Title: {paper.title}\nAuthors: {authors}\nLink: {link}\nSummary: {summary}\n\n"
-        prompt += "Ensure the newsletter is detailed and formatted for a professional audience."
+        prompt += "Ensure the newsletter is detailed and formatted for a professional audience.\n"
+
+        # Add prompt for the bigger picture explanation
+        prompt += "At the end of the newsletter, write a 4-sentence explanation on how the topics are related to each other and title it 'The Bigger Picture'.\n"
+
+        # Add prompt for the joke
+        prompt += "At the very end of the newsletter, create a joke based on the information in the newsletter and title it 'The Punchline'.\n"
+
+        # Add the sign-off message
+        prompt += "\n That is all for this issue.Stay tuned for our next issue and stay curious and keep crunching those numbers!\n\nBest regards,\nThe Probability Post Team"
+
+        # Add the newsletter title and introduction
+        prompt = "Title: The Probability Post\n\nHi Stat Fam,\n\nWelcome to the latest edition of The Probability Post, where we bring you cutting-edge research from the world of statistics. Let's dive into the exciting new papers that are shaping our field!\n\n" + prompt
 
         response = ollama.chat(model="llama3", messages=[
             {
@@ -101,7 +120,7 @@ def create_newsletter(categorized):
                 'content': prompt
             },
         ])
-        
+
         if isinstance(response, dict) and 'message' in response and 'content' in response['message']:
             newsletter = response['message']['content']
         else:
@@ -120,12 +139,14 @@ def main():
         for index, paper in enumerate(papers, start=1):
             print(f"Processing paper {index}/{len(papers)}: {paper.title}")
             summary = get_summary_from_cache(paper.summary)
+            rouge_scores = calculate_rouge(paper.summary, summary)
             print(f"Title: {paper.title}")
             print(f"Authors: {', '.join(author.name for author in paper.authors)}")
             print(f"Summary: {summary}")
             print(f"Link: {paper.entry_id}")
             category = categorize_abstract_with_llama(summary)
             print(f"Category: {category}")
+            print(f"ROUGE Scores: {rouge_scores}")
             summaries_and_categories.append((summary, category, paper))
 
         categorized = {category: [] for category in [
@@ -138,7 +159,7 @@ def main():
             "Spatial Statistics", "Stochastic Processes", "Data Mining", "Statistical Methodology",
             "Neural Networks", "Reinforcement Learning", "Ensemble Learning",
             "Inferential Statistics", "Descriptive Statistics", "Machine Learning",
-            "Statistics Sampling", "Bioinformatics", "Statistical Decision Theory", "Uncategorized"
+            "Statistics Sampling", "Bioinformatics", "Statistical Decision Theory", "Casual Inference", "Uncategorized"
         ]}
 
         # Categorize each summary and paper
@@ -157,3 +178,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
